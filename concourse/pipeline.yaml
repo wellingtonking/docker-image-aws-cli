@@ -1,11 +1,3 @@
-# ((auth-gitwk-rw.access-token))
-# ((auth-harbor-production-rw.email))
-# ((auth-harbor-production-rw.password))
-# ((auth-harbor-production-rw.prefix))
-# ((auth-harbor-production-rw.project))
-# ((auth-harbor-production-rw.username))
-# ((auth-slack-wo.hook_url))
-
 resource_types:
 - name: slack-alert
   source:
