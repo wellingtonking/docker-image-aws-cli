@@ -1,0 +1,74 @@
+# ((auth-gitwk-rw.access-token))
+# ((auth-harbor-production-rw.email))
+# ((auth-harbor-production-rw.password))
+# ((auth-harbor-production-rw.prefix))
+# ((auth-harbor-production-rw.project))
+# ((auth-harbor-production-rw.username))
+# ((auth-slack-wo.hook_url))
+
+resource_types:
+- name: slack-alert
+  source:
+    repository: arbourd/concourse-slack-alert-resource
+  type: docker-image
+
+resources:
+- name: image-aws-cli-image
+  source:
+    email: ((auth-harbor-production-rw.email))
+    password: ((auth-harbor-production-rw.password))
+    repository: ((auth-harbor-production-rw.prefix))((auth-harbor-production-rw.project))/aws-cli
+    tag: latest
+    username: ((auth-harbor-production-rw.username))
+    insecure_registries: ["harbor.wkng.net"]
+  type: docker-image
+- name: image-aws-cli-sources
+  source:
+    branch: main
+    skip_ssl_verification: true
+    uri: https://github.com/wellingtonking/docker-image-aws-cli.git
+  type: git
+
+- name: slack-notify
+  source:
+    url: ((auth-slack-wo.hook_url))
+  type: slack-alert
+
+jobs:
+- name: self-update-pipeline
+  serial: true
+  plan:
+  - get: image-aws-cli-sources
+    trigger: true
+  - set_pipeline: self
+    file: image-aws-cli-sources/concourse/pipeline.yaml
+
+- name: build-and-push
+  on_abort:
+    params:
+      alert_type: aborted
+    put: slack-notify
+  on_error:
+    params:
+      alert_type: errored
+    put: slack-notify
+  on_failure:
+    params:
+      alert_type: failed
+    put: slack-notify
+  on_success:
+    params:
+      alert_type: success
+    put: slack-notify
+  plan:
+  - get: image-aws-cli-sources
+    trigger: true
+  - params:
+      additional_tags: image-aws-cli-sources/docker/additional_tags
+      build: image-aws-cli-sources
+      build_args_file: image-aws-cli-sources/docker/metadata.json
+      dockerfile: image-aws-cli-sources/Dockerfile.alpine
+    put: image-aws-cli-image
+  public: true
+  serial: true
+
